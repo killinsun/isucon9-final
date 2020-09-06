@@ -352,27 +352,23 @@ module Isutrain
         if is_contains_origin_station && is_contains_dest_station
           # 列車情報
 
-          departure = db.xquery(
-            'SELECT `departure` FROM `train_timetable_master` WHERE `date` = ? AND `train_class` = ? AND `train_name` = ? AND `station` = ?',
+          daily_train_class_table = db.xquery(
+            'SELECT * FROM `train_timetable_master` WHERE date = ? AND `train_class` = ? AND `train_name` = ?',
             date.strftime('%Y/%m/%d'),
             train[:train_class],
             train[:train_name],
-            from_station[:name],
             cast: false,
-          ).first
+          )
 
-          departure_date = Time.parse("#{date.strftime('%Y/%m/%d')} #{departure[:departure]} +09:00 JST")
+          from_row = daily_train_class_table.find_all { |x| x[:station].include?(from_station[:name]) }
+          to_row = daily_train_class_table.select { |x| x[:station].include?(to_station[:name]) }
+
+          departure = from_row[0][:departure]
+          arrival = to_row[0][:arrival]
+
+          departure_date = Time.parse("#{date.strftime('%Y/%m/%d')} #{departure} +09:00 JST")
 
           next unless date < departure_date
-
-          arrival = db.xquery(
-            'SELECT `arrival` FROM `train_timetable_master` WHERE date = ? AND `train_class` = ? AND `train_name` = ? AND `station` = ?',
-            date.strftime('%Y/%m/%d'),
-            train[:train_class],
-            train[:train_name],
-            to_station[:name],
-            cast: false,
-          ).first
 
           premium_avail_seats = get_available_seats(train, from_station, to_station, 'premium', false)
           premium_smoke_avail_seats = get_available_seats(train, from_station, to_station, 'premium', true)
@@ -441,8 +437,8 @@ module Isutrain
             last: train[:last_station],
             departure: from_station[:name],
             arrival: to_station[:name],
-            departure_time: departure[:departure],
-            arrival_time: arrival[:arrival],
+            departure_time: departure,
+            arrival_time: arrival,
             seat_availability: seat_availability,
             seat_fare: fare_information,
           }
